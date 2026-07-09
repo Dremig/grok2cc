@@ -254,6 +254,20 @@ function rewriteBody(buf, contentType) {
 
   body = sanitizeMessages(body);
 
+  // xAI rejects these (Claude Code auto/safety classifier sends stop_sequences).
+  // Error seen: "Model grok-4.5 does not support parameter stop."
+  // Claude Code then surfaces a misleading "model temporarily unavailable" for Bash auto-mode.
+  const stripped = [];
+  for (const k of ["stop", "stop_sequences", "stop_sequence"]) {
+    if (k in body) {
+      stripped.push(`${k}=${JSON.stringify(body[k])}`);
+      delete body[k];
+    }
+  }
+  if (stripped.length) {
+    log("strip unsupported fields:", stripped.join(", "));
+  }
+
   // Optional: drop Claude-only beta request fields that some gateways reject.
   if (process.env.GROK_HARNESS_STRIP_BETA === "1") {
     delete body.thinking;

@@ -102,7 +102,27 @@ Notes:
 | `GROK_HARNESS_UPSTREAM` | Upstream base (default `https://api.x.ai`) |
 | `GROK_AUTH_JSON` | Path to Grok auth file |
 | `XAI_API_KEY` / `GROK_HARNESS_TOKEN` | Override token instead of auth.json |
-| `GROK_HARNESS_LOG=1` | Log each proxied request |
+| `GROK_HARNESS_LOG=1` | Log each proxied request (LaunchAgent already sets this) |
+
+### Logs & debugging
+
+| Path | What |
+|------|------|
+| `~/Library/Logs/grok2cc/harness-proxy.err.log` | Request log: method, path, status, latency, 4xx error body |
+| `/tmp/grok2cc-last-request.json` | Last rewritten body sent upstream |
+| `/tmp/grok2cc-last-raw-request.json` | Last raw Claude request (on 4xx) |
+| `/tmp/grok2cc-last-error.json` | Last upstream error body (on 4xx) |
+
+```bash
+tail -f ~/Library/Logs/grok2cc/harness-proxy.err.log
+curl -s http://127.0.0.1:8790/health
+```
+
+**Known Claude Code + Grok quirks (handled by proxy):**
+
+- `stop` / `stop_sequences` — auto-mode Bash safety classifier sends these; xAI rejects → Claude may say “model temporarily unavailable”
+- invalid roles (`system`/`tool` in `messages`) — normalized
+- tool JSON Schema `required` must be an array
 
 ---
 
