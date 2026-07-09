@@ -1,0 +1,48 @@
+{
+  "claudeCode.environmentVariables": [
+    {
+      "name": "ANTHROPIC_BASE_URL",
+      "value": "http://127.0.0.1:8790"
+    },
+    {
+      "name": "ANTHROPIC_API_KEY",
+      "value": "grok-harness"
+    },
+    {
+      "name": "ANTHROPIC_MODEL",
+      "value": "grok-4.5"
+    },
+    {
+      "name": "ANTHROPIC_DEFAULT_SONNET_MODEL",
+      "value": "grok-4.5"
+    },
+    {
+      "name": "ANTHROPIC_DEFAULT_OPUS_MODEL",
+      "value": "grok-4.5"
+    },
+    {
+      "name": "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+      "value": "grok-4.5"
+    },
+    {
+      "name": "ANTHROPIC_SMALL_FAST_MODEL",
+      "value": "grok-4.5"
+    },
+    {
+      "name": "ANTHROPIC_REASONING_MODEL",
+      "value": "grok-4.5"
+    },
+    {
+      "name": "NO_PROXY",
+      "value": "127.0.0.1,localhost"
+    },
+    {
+      "name": "no_proxy",
+      "value": "127.0.0.1,localhost"
+    },
+    {
+      "name": "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+      "value": "1"
+    }
+  ]
+}
