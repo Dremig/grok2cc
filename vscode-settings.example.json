@@ -1,4 +1,6 @@
 {
+  "claudeCode.disableLoginPrompt": true,
+  "claudeCode.preferredLocation": "panel",
   "claudeCode.environmentVariables": [
     {
       "name": "ANTHROPIC_BASE_URL",
@@ -6,6 +8,10 @@
     },
     {
       "name": "ANTHROPIC_API_KEY",
+      "value": "grok-harness"
+    },
+    {
+      "name": "ANTHROPIC_AUTH_TOKEN",
       "value": "grok-harness"
     },
     {

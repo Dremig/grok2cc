@@ -55,38 +55,37 @@ Health: `curl http://127.0.0.1:8790/health`
 
 ### VS Code official Claude Code extension
 
-**Yes — same Mode B path works.** The [official VS Code extension](https://code.claude.com/docs/en/vs-code) spawns Claude Code and reads gateway credentials from VS Code’s own settings (not only from `~/.claude/settings.json`).
+**Yes — same Mode B path works.** Use the installer:
 
-1. Keep the local proxy running (`node harness-proxy.mjs` or `./claude-with-grok.sh` once so it starts).
-2. Open **Preferences: Open User Settings (JSON)** and add (see also [`vscode-settings.example.json`](./vscode-settings.example.json)):
-
-```json
-{
-  "claudeCode.environmentVariables": [
-    { "name": "ANTHROPIC_BASE_URL", "value": "http://127.0.0.1:8790" },
-    { "name": "ANTHROPIC_API_KEY", "value": "grok-harness" },
-    { "name": "ANTHROPIC_MODEL", "value": "grok-4.5" },
-    { "name": "ANTHROPIC_DEFAULT_SONNET_MODEL", "value": "grok-4.5" },
-    { "name": "ANTHROPIC_DEFAULT_OPUS_MODEL", "value": "grok-4.5" },
-    { "name": "ANTHROPIC_DEFAULT_HAIKU_MODEL", "value": "grok-4.5" },
-    { "name": "ANTHROPIC_SMALL_FAST_MODEL", "value": "grok-4.5" },
-    { "name": "ANTHROPIC_REASONING_MODEL", "value": "grok-4.5" },
-    { "name": "NO_PROXY", "value": "127.0.0.1,localhost" },
-    { "name": "no_proxy", "value": "127.0.0.1,localhost" },
-    { "name": "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", "value": "1" }
-  ]
-}
+```bash
+git clone https://github.com/Dremig/grok2cc.git
+cd grok2cc
+./install-vscode.sh
+# optional model:
+# MODEL=grok-build-0.1 ./install-vscode.sh
 ```
 
-3. Reload the VS Code window, open the Claude Code panel.
+What it does:
+
+1. Patches VS Code / Cursor / Insiders `settings.json` (`claudeCode.environmentVariables` + `disableLoginPrompt`)
+2. Patches `~/.claude/settings.json` (gateway env; backs up previous file)
+3. Approves the dummy key `grok-harness` in `~/.claude.json`
+4. Starts `harness-proxy.mjs` and installs a macOS LaunchAgent so it survives reboot
+
+Then: **Developer: Reload Window** → open Claude Code panel.
+
+```bash
+./install-vscode.sh --uninstall   # restore latest backups, stop LaunchAgent
+./install-vscode.sh --no-launchd  # config only; no LaunchAgent
+```
+
+Manual JSON (if you prefer): [`vscode-settings.example.json`](./vscode-settings.example.json).
 
 Notes:
 
-- Use `ANTHROPIC_API_KEY` (any non-empty string). Our proxy accepts `x-api-key` and rewrites to xAI `Bearer` from `~/.grok/auth.json`.
-- Official docs put gateway env on `claudeCode.environmentVariables` so the extension’s login check also sees them ([LLM gateway connect](https://code.claude.com/docs/en/llm-gateway-connect)).
-- If you use a system HTTP proxy (e.g. Clash on `:7890`), keep `NO_PROXY` for loopback or the extension may never hit `127.0.0.1:8790`.
-- This still uses **Claude Code’s harness** (tools/permissions/UI). Only the model is Grok.
-- To go back to normal Claude, remove or comment out that settings block and reload.
+- Real auth: `grok login` (`~/.grok/auth.json`) or `XAI_API_KEY`
+- Extension gateway vars: [LLM gateway connect](https://code.claude.com/docs/en/llm-gateway-connect)
+- Still **Claude Code harness**; only the model is Grok
 
 ### Verified
 

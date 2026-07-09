@@ -12,7 +12,9 @@
     "start": "node harness-proxy.mjs",
     "mcp": "node server.mjs",
     "probe": "node scripts/probe.mjs",
-    "claude": "bash claude-with-grok.sh"
+    "claude": "bash claude-with-grok.sh",
+    "install-vscode": "bash install-vscode.sh",
+    "uninstall-vscode": "bash install-vscode.sh --uninstall"
   },
   "keywords": [
     "grok",
