@@ -108,6 +108,122 @@ function sanitizeSchema(schema, depth = 0) {
   return out;
 }
 
+function contentToText(content) {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return content == null ? "" : String(content);
+  return content
+    .map((b) => {
+      if (typeof b === "string") return b;
+      if (!b || typeof b !== "object") return "";
+      if (b.type === "text" && typeof b.text === "string") return b.text;
+      if (typeof b.text === "string") return b.text;
+      return "";
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
+function normalizeSystemField(system) {
+  if (system == null) return [];
+  if (typeof system === "string") {
+    return system ? [{ type: "text", text: system }] : [];
+  }
+  if (Array.isArray(system)) {
+    return system
+      .map((b) => {
+        if (typeof b === "string") return { type: "text", text: b };
+        if (b && typeof b === "object" && b.type === "text") return b;
+        if (b && typeof b === "object" && typeof b.text === "string") {
+          return { type: "text", text: b.text };
+        }
+        return null;
+      })
+      .filter(Boolean);
+  }
+  return [{ type: "text", text: String(system) }];
+}
+
+/**
+ * xAI Anthropic-compat only accepts message roles: user | assistant.
+ * Claude Code / other harnesses may send system | developer | tool.
+ */
+function sanitizeMessages(body) {
+  if (!Array.isArray(body.messages)) return body;
+
+  const systemExtra = [];
+  const out = [];
+
+  for (const msg of body.messages) {
+    if (!msg || typeof msg !== "object") continue;
+    let role = msg.role;
+    let content = msg.content;
+
+    // Fold system/developer into top-level `system`
+    if (role === "system" || role === "developer") {
+      const text = contentToText(content);
+      if (text) systemExtra.push({ type: "text", text });
+      continue;
+    }
+
+    // OpenAI-style tool role → Anthropic tool_result on user message
+    if (role === "tool") {
+      const toolUseId = msg.tool_use_id || msg.tool_call_id || msg.id;
+      const resultContent =
+        typeof content === "string" || Array.isArray(content)
+          ? content
+          : contentToText(content);
+      out.push({
+        role: "user",
+        content: [
+          {
+            type: "tool_result",
+            tool_use_id: toolUseId || "tool_call",
+            content: resultContent,
+          },
+        ],
+      });
+      continue;
+    }
+
+    // Unknown roles → user text (better than hard-fail)
+    if (role !== "user" && role !== "assistant") {
+      const text = contentToText(content);
+      out.push({
+        role: "user",
+        content: text
+          ? `[(normalized from role=${role})] ${text}`
+          : `[(empty message from role=${role})]`,
+      });
+      continue;
+    }
+
+    if (STRIP_THINKING && Array.isArray(content)) {
+      content = content.filter(
+        (b) => b && b.type !== "thinking" && b.type !== "redacted_thinking"
+      );
+      if (!content.length) {
+        content = role === "assistant" ? [{ type: "text", text: "" }] : [{ type: "text", text: "" }];
+      }
+    }
+
+    out.push({ ...msg, role, content });
+  }
+
+  // Merge extracted system prompts
+  if (systemExtra.length) {
+    const existing = normalizeSystemField(body.system);
+    body.system = [...existing, ...systemExtra];
+  }
+
+  // Drop empty system
+  if (Array.isArray(body.system) && body.system.length === 0) {
+    delete body.system;
+  }
+
+  body.messages = out;
+  return body;
+}
+
 function rewriteBody(buf, contentType) {
   if (!buf?.length) return buf;
   if (!contentType || !String(contentType).includes("application/json")) return buf;
@@ -136,28 +252,9 @@ function rewriteBody(buf, contentType) {
     });
   }
 
-  if (STRIP_THINKING && Array.isArray(body.messages)) {
-    body.messages = body.messages.map((msg) => {
-      if (!msg || !Array.isArray(msg.content)) return msg;
-      const content = msg.content.filter(
-        (b) => b && b.type !== "thinking" && b.type !== "redacted_thinking"
-      );
-      if (!content.length && msg.role === "assistant") {
-        return { ...msg, content: [{ type: "text", text: "" }] };
-      }
-      return { ...msg, content };
-    });
-  }
+  body = sanitizeMessages(body);
 
   // Optional: drop Claude-only beta request fields that some gateways reject.
-  // Keep them by default for richer behavior; set GROK_HARNESS_STRIP_BETA=1 to drop.
-  if (STRIP_BETA_FIELDS) {
-    // We keep thinking/context_management for now — only strip if explicitly enabled via env.
-    // (default STRIP_BETA is "0" unless env set — wait: default !== "0" means ON)
-  }
-  // Default: strip known-problematic beta extras that aren't needed for tool loop.
-  // thinking:adaptive and context_management clear_thinking may be unsupported long-term.
-  // Empirically tool schema was the hard fail; leave other fields unless env forces strip.
   if (process.env.GROK_HARNESS_STRIP_BETA === "1") {
     delete body.thinking;
     delete body.context_management;
@@ -198,6 +295,13 @@ function proxy(req, res) {
     const contentType = req.headers["content-type"] || "application/json";
     const body = rewriteBody(rawBody, contentType);
 
+    // Debug dumps (always write last rewritten body; dump raw on 4xx)
+    try {
+      fs.writeFileSync("/tmp/grok2cc-last-request.json", body);
+    } catch {
+      /* ignore */
+    }
+
     const upstreamUrl = new URL(req.url || "/", UPSTREAM + "/");
     // Ensure path stays under upstream origin
     const isHttps = upstreamUrl.protocol === "https:";
@@ -226,9 +330,34 @@ function proxy(req, res) {
         headers,
       },
       (pres) => {
-        res.writeHead(pres.statusCode || 502, pres.headers);
+        const status = pres.statusCode || 502;
+        if (status >= 400) {
+          try {
+            fs.writeFileSync("/tmp/grok2cc-last-raw-request.json", rawBody);
+            fs.writeFileSync("/tmp/grok2cc-last-rewritten-request.json", body);
+          } catch {
+            /* ignore */
+          }
+          const errChunks = [];
+          pres.on("data", (c) => errChunks.push(c));
+          pres.on("end", () => {
+            const errBody = Buffer.concat(errChunks);
+            try {
+              fs.writeFileSync("/tmp/grok2cc-last-error.json", errBody);
+            } catch {
+              /* ignore */
+            }
+            log(req.method, req.url, status, `${Date.now() - start}ms`, errBody.toString("utf8").slice(0, 300));
+            if (!res.headersSent) {
+              res.writeHead(status, { "content-type": "application/json" });
+            }
+            res.end(errBody);
+          });
+          return;
+        }
+        res.writeHead(status, pres.headers);
         pres.pipe(res);
-        pres.on("end", () => log(req.method, req.url, pres.statusCode, `${Date.now() - start}ms`));
+        pres.on("end", () => log(req.method, req.url, status, `${Date.now() - start}ms`));
       }
     );
     preq.on("error", (err) => {
