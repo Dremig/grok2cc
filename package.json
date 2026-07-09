@@ -1,7 +1,7 @@
 {
   "name": "grok2cc",
   "version": "0.1.0",
-  "description": "Grok ↔ Claude Code: harness proxy (Grok as model) + MCP nested-agent bridge",
+  "description": "Grok \u2194 Claude Code: harness proxy (Grok as model) + MCP nested-agent bridge",
   "type": "module",
   "bin": {
     "grok2cc-mcp": "./server.mjs",
