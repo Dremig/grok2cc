@@ -1,0 +1,39 @@
+{
+  "name": "grok2cc",
+  "version": "0.1.0",
+  "description": "Grok ↔ Claude Code: harness proxy (Grok as model) + MCP nested-agent bridge",
+  "type": "module",
+  "bin": {
+    "grok2cc-mcp": "./server.mjs",
+    "grok2cc": "./claude-with-grok.sh"
+  },
+  "scripts": {
+    "proxy": "node harness-proxy.mjs",
+    "start": "node harness-proxy.mjs",
+    "mcp": "node server.mjs",
+    "probe": "node scripts/probe.mjs",
+    "claude": "bash claude-with-grok.sh"
+  },
+  "keywords": [
+    "grok",
+    "xai",
+    "claude-code",
+    "anthropic",
+    "mcp",
+    "harness",
+    "proxy"
+  ],
+  "author": "Dremig",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Dremig/grok2cc.git"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^4.4.3"
+  }
+}
